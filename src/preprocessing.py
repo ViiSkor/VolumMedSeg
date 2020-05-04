@@ -33,17 +33,26 @@ def preprocess_label(mask, output_classes=['ed'], merge_classes=False, out_shape
     et = mask == 4  # GD-enhancing Tumor (ET)
     
     if out_shape is not None:
-        ncr = resize(ncr, out_shape, mode=mode)
-        ed = resize(ed, out_shape, mode=mode)
-        et = resize(et, out_shape, mode=mode)
+        ncr = fill_labels(resize(ncr, out_shape, mode=mode), slice_nums=out_shape[-1])
+        ed = fill_labels(resize(ed, out_shape, mode=mode), slice_nums=out_shape[-1])
+        et = fill_labels(resize(et, out_shape, mode=mode), slice_nums=out_shape[-1])
 
-    output = []
+    masks = []
     if 'ncr' in output_classes:
-      output.append(ncr)
+      masks.append(ncr)
     if 'ed' in output_classes:
-      output.append(ed)
+      masks.append(ed)
     if 'et' in output_classes:
-      output.append(et)
+      masks.append(et)
+    
+    output = []
+    if merge_classes:
+      output = np.zeros_like(masks[0])
+      for label in masks:
+        output += label
+      output = [output]
+    else:
+      masks = output
 
     return np.array(output, dtype=np.uint8)
 
