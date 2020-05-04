@@ -1,5 +1,7 @@
 from tensorflow.keras import Model
-from tensorflow.keras.layers import Conv3D, Conv3DTranspose, Input, BatchNormalization, Activation, MaxPool3D, SpatialDropout3D, Concatenate
+from tensorflow.keras.layers import Conv3D, Conv3DTranspose, Input, Activation, MaxPool3D, Concatenate
+
+from blocks import conv3d_block
 
 
 class Unet3D:
@@ -9,7 +11,9 @@ class Unet3D:
                activation="relu",
                n_base_filters=8,
                batchnorm=False,
-               spatial_dropout=False,
+               dropout_prob=0.2,
+               dropout_type="spatial",
+               dropout_prob_shift=0.1,
                batch_size=None,
                model_depth=5,
                name="3DUnet"):
@@ -18,7 +22,9 @@ class Unet3D:
     self.activation = activation
     self.n_base_filters = n_base_filters
     self.batchnorm = batchnorm
-    self.spatial_dropout = spatial_dropout
+    self.dropout_prob = dropout_prob
+    self.dropout_type = dropout_type
+    self.dropout_prob_shift = dropout_prob_shift
     self.batch_size = batch_size
     self.model_depth = model_depth
     self.name = name
@@ -44,37 +50,23 @@ class Unet3D:
   def encoder(self, inputs):
     x = inputs
     for depth in range(self.model_depth):
-      x = Conv3D(self.n_base_filters * (2**depth), **self.conv_kwds)(x)
-      if self.batchnorm:
-          x = BatchNormalization()(x)
-      x = Activation(self.activation)(x)
-      x = Conv3D(self.n_base_filters * (2**(depth+1)), **self.conv_kwds)(x)
-      if self.batchnorm:
-          x = BatchNormalization()(x)
-      x = Activation(self.activation)(x)
+      filters = self.n_base_filters * (2**depth)
+      x = conv3d_block(x, filters, self.conv_kwds, self.activation, self.dropout_prob, self.dropout_type, self.batchnorm)
       if depth < self.model_depth - 1:
         self.skips.append(x)
         x = MaxPool3D(2)(x)
-        if self.spatial_dropout:
-          x = SpatialDropout3D(0.5)(x)
+
+      self.dropout_prob += self.dropout_prob_shift
 
     return x
 
   def decoder(self, x):
     for depth in range(self.model_depth-1, 0, -1):
-      x = Conv3DTranspose(self.n_base_filters * (2**(depth+1)), **self.conv_transpose_kwds)(x)
-
+      filters = self.n_base_filters * (2**depth)
+      self.dropout_prob -= self.dropout_prob_shift
+      x = Conv3DTranspose(filters, **self.conv_transpose_kwds)(x)
       x = Concatenate(axis=-1)([self.skips[depth-1], x])
-      if self.spatial_dropout:
-          x = SpatialDropout3D(0.5)(x)
-      x = Conv3D(self.n_base_filters * (2**depth), **self.conv_kwds)(x)
-      if self.batchnorm:
-          x = BatchNormalization()(x)
-      x = Activation(self.activation)(x)
-      x = Conv3D(self.n_base_filters * (2**depth), **self.conv_kwds)(x)
-      if self.batchnorm:
-          x = BatchNormalization()(x)
-      x = Activation(self.activation)(x)
+      x = conv3d_block(x, filters, self.conv_kwds, self.activation, self.dropout_prob, self.dropout_type, self.batchnorm)
 
     x = Conv3D(filters=self.n_classes, kernel_size=1)(x)
     return x
