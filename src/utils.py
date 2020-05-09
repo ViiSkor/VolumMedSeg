@@ -6,7 +6,7 @@ import nibabel as nib
 from tqdm import tqdm
 
 
-def get_fpaths(data_dir):
+def get_3Dfpaths(data_dir):
   '''Parse all the filenames and create a dictionary for each patient with structure:
   {
       't1': <path to t1 MRI file>
@@ -33,6 +33,57 @@ def get_fpaths(data_dir):
   for items in list(zip(t1, t2, t1ce, flair, seg))]
 
   return data_paths
+
+
+def get_2Dfpaths(data_dir):
+  '''Parse all the filenames and create a dictionary for each patient with structure:
+  {
+      't1': list(<paths to t1 MRI file>)
+      't2': list(<paths to t2 MRI>)
+      'flair': list(<paths to FLAIR MRI file>)
+      't1ce': list(<paths to t1ce MRI file>)
+      'seg': list(<paths to Ground Truth file>)
+  }
+  '''
+
+  pat = re.compile('.*_(\w*)')
+  data_paths = []
+  for case in glob.glob(os.path.join(data_dir, '*')):
+    # Get a list of files for all modalities individually
+    t1 = sorted(glob.glob(os.path.join(case, '*t1/*.npy')))
+    t2 = sorted(glob.glob(os.path.join(case, '*t2/*.npy')))
+    flair = sorted(glob.glob(os.path.join(case, '*flair/*.npy')))
+    t1ce = sorted(glob.glob(os.path.join(case, '*t1ce/*.npy')))
+    seg = sorted(glob.glob(os.path.join(case, '*seg/*.npy')))  # Ground Truth
+    
+    data = {}
+    for items in list(zip(t1, t2, t1ce, flair, seg)):
+      for item in items:
+        data[pat.findall(item)[0]] = data.get(pat.findall(item)[0], []) + [item]
+
+    data_paths.append(data)
+
+  return data_paths
+
+
+def unpack_2D_fpaths(packed_data_paths):
+  upacked_data_paths = []
+  for paths in packed_data_paths:
+    t1 = paths['t1']
+    t2 = paths['t2']
+    flair = paths['flair']
+    t1ce = paths['t1ce']
+    seg = paths['seg']
+    
+      
+    pat = re.compile('.*_(\w*)')
+
+    upacked_data_paths.extend([{
+        pat.findall(item)[0]:item
+        for item in items
+    }
+    for items in list(zip(t1, t2, t1ce, flair, seg))])
+  return upacked_data_paths
 
 
 def change_orientation(img):
