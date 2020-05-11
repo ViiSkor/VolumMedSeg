@@ -1,7 +1,7 @@
 from tensorflow.keras import Model
 from tensorflow.keras.layers import Conv2D, Conv3D, Conv2DTranspose, Conv3DTranspose, Input, Activation, MaxPool2D, MaxPool3D, Concatenate
 
-from blocks import conv_block
+from blocks import conv_block, dilate_conv_block
 
 
 class Unet:
@@ -16,6 +16,9 @@ class Unet:
                dropout_prob_shift=0.1,
                batch_size=None,
                model_depth=4,
+               dilate=False,
+               bottleneck_depth=2,
+               max_dilation_rate=32,
                name="Unet",
                mode="3D"):
     self.n_classes = n_classes
@@ -28,6 +31,8 @@ class Unet:
     self.dropout_prob_shift = dropout_prob_shift
     self.batch_size = batch_size
     self.model_depth = model_depth
+    self.dilate = dilate
+    self.max_dilation_rate = max_dilation_rate
     self.name = name
     self.mode = mode
 
@@ -102,7 +107,19 @@ class Unet:
 
   def bottleneck(self, x):
     filters = self.n_base_filters * (2**self.model_depth)
-    x = conv_block(inputs=x,
+    if self.dilate:
+      x = dilate_conv_block(x=x,
+                   n_filters=filters,
+                   max_dilation_rate=self.max_dilation_rate,
+                   conv_kwds=self.conv_kwds,
+                   activation=self.activation,
+                   dropout_prob=self.dropout_prob,
+                   conv_type=self.mode,
+                   dropout_type=self.dropout_type,
+                   batchnorm=self.batchnorm)
+    else:
+      for _ in range(1, self.bottleneck_depth, 2):
+        x = conv_block(inputs=x,
                    n_filters=filters,
                    conv_kwds=self.conv_kwds,
                    activation=self.activation,
@@ -110,6 +127,17 @@ class Unet:
                    conv_type=self.mode,
                    dropout_type=self.dropout_type,
                    batchnorm=self.batchnorm)
+        x = conv_block(inputs=x,
+                   n_filters=filters,
+                   conv_kwds=self.conv_kwds,
+                   activation=self.activation,
+                   dropout_prob=self.dropout_prob,
+                   conv_type=self.mode,
+                   dropout_type=self.dropout_type,
+                   batchnorm=self.batchnorm)
+      if self.bottleneck_depth % 2 != 0:
+        x = self.conv(filters=filters, **self.conv_kwds)(x)
+
     return x
 
   def decoder(self, x):
