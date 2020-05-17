@@ -31,6 +31,7 @@ class Unet:
     self.dropout_prob_shift = dropout_prob_shift
     self.batch_size = batch_size
     self.model_depth = model_depth
+    self.bottleneck_depth = bottleneck_depth
     self.dilate = dilate
     self.max_dilation_rate = max_dilation_rate
     self.name = name

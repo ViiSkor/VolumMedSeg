@@ -171,8 +171,9 @@ class Med2DDataGenerator(Sequence):
 
         # Generate data
         for i, imgs in enumerate(list_fpaths_temp):
-          modalities = np.array([np.load(imgs[m]) for m in self.scan_types])
-          masks = preprocess_label(np.load(imgs['seg']),
+          curr_slice = imgs['seg'][1]
+          modalities = np.array([np.load(imgs[m][0])[curr_slice] for m in self.scan_types])
+          masks = preprocess_label(np.load(imgs['seg'][0])[curr_slice],
                                    output_classes=self.output_classes,
                                    merge_classes=self.merge_classes)
 
@@ -189,4 +190,5 @@ class Med2DDataGenerator(Sequence):
           X[i] = (X[i] - np.mean(X[i])) / np.std(X[i])
 
         return X, y
+  
   

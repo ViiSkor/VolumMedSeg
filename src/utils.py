@@ -1,12 +1,13 @@
 import glob
 import re
 import os
+import random
 import numpy as np
 import nibabel as nib
 from tqdm import tqdm
 
 
-def get_3Dfpaths(data_dir):
+def get_fpaths(data_dir, mode="3D"):
   '''Parse all the filenames and create a dictionary for each patient with structure:
   {
       't1': <path to t1 MRI file>
@@ -18,13 +19,18 @@ def get_3Dfpaths(data_dir):
   '''
 
   # Get a list of files for all modalities individually
-  t1 = glob.glob(os.path.join(data_dir, '*/*t1.nii.gz'))
-  t2 = glob.glob(os.path.join(data_dir, '*/*t2.nii.gz'))
-  flair = glob.glob(os.path.join(data_dir, '*/*flair.nii.gz'))
-  t1ce = glob.glob(os.path.join(data_dir, '*/*t1ce.nii.gz'))
-  seg = glob.glob(os.path.join(data_dir, '*/*seg.nii.gz'))  # Ground Truth
+  if mode == "3D":
+    ext = 'nii.gz'
+    pat = re.compile('.*_(\w*)\.nii\.gz')
+  elif mode == "2D":
+    ext = 'npy'
+    pat = re.compile('.*_(\w*)\.npy')
   
-  pat = re.compile('.*_(\w*)\.nii\.gz')
+  t1 = glob.glob(os.path.join(data_dir, f'*/*t1.{ext}'))
+  t2 = glob.glob(os.path.join(data_dir, f'*/*t2.{ext}'))
+  flair = glob.glob(os.path.join(data_dir, f'*/*flair.{ext}'))
+  t1ce = glob.glob(os.path.join(data_dir, f'*/*t1ce.{ext}'))
+  seg = glob.glob(os.path.join(data_dir, f'*/*seg.{ext}'))  # Ground Truth
 
   data_paths = [{
       pat.findall(item)[0]:item
@@ -35,54 +41,36 @@ def get_3Dfpaths(data_dir):
   return data_paths
 
 
-def get_2Dfpaths(data_dir):
-  '''Parse all the filenames and create a dictionary for each patient with structure:
-  {
-      't1': list(<paths to t1 MRI file>)
-      't2': list(<paths to t2 MRI>)
-      'flair': list(<paths to FLAIR MRI file>)
-      't1ce': list(<paths to t1ce MRI file>)
-      'seg': list(<paths to Ground Truth file>)
-  }
-  '''
-
-  pat = re.compile('.*_(\w*)')
-  data_paths = []
-  for case in glob.glob(os.path.join(data_dir, '*')):
-    # Get a list of files for all modalities individually
-    t1 = sorted(glob.glob(os.path.join(case, '*t1/*.npy')))
-    t2 = sorted(glob.glob(os.path.join(case, '*t2/*.npy')))
-    flair = sorted(glob.glob(os.path.join(case, '*flair/*.npy')))
-    t1ce = sorted(glob.glob(os.path.join(case, '*t1ce/*.npy')))
-    seg = sorted(glob.glob(os.path.join(case, '*seg/*.npy')))  # Ground Truth
-    
-    data = {}
-    for items in list(zip(t1, t2, t1ce, flair, seg)):
-      for item in items:
-        data[pat.findall(item)[0]] = data.get(pat.findall(item)[0], []) + [item]
-
-    data_paths.append(data)
-
-  return data_paths
-
-
-def unpack_2D_fpaths(packed_data_paths):
+def unpack_2D_fpaths(packed_data_paths, only_with_mask=True):
   upacked_data_paths = []
+  mod_names = packed_data_paths[0].keys()
   for paths in packed_data_paths:
-    t1 = paths['t1']
-    t2 = paths['t2']
-    flair = paths['flair']
-    t1ce = paths['t1ce']
-    seg = paths['seg']
-    
-      
-    pat = re.compile('.*_(\w*)')
+    frst_slice = 0
+    last_slice = 0
+    img = np.load(paths['seg'])
+    if only_with_mask:
+      for i in range(img.shape[0]):
+        curr_slice = img[i, :, :]
+        if np.sum(curr_slice) == 0:
+          if last_slice <= frst_slice:
+            frst_slice = i
+        else:
+          last_slice = i
+      frst_slice += 1
+    else:
+      last_slice = img.shape[0]
+    depth = 0
+    modalities = {}
+    for name, path in paths.items():
+      data = np.load(path)
+      data = data[frst_slice:last_slice]
+      depth = data.shape[0]
+      for i in range(depth):
+        modalities[name] = modalities.get(name, []) + [(path, i)]
 
-    upacked_data_paths.extend([{
-        pat.findall(item)[0]:item
-        for item in items
-    }
-    for items in list(zip(t1, t2, t1ce, flair, seg))])
+    for i in range(depth):
+      upacked_data_paths.append({name: modalities[name][i] for name in mod_names})
+      
   return upacked_data_paths
 
 
@@ -150,3 +138,21 @@ def get_preprocessed_data(data_paths:dict, scan_types=['t1', 'seg']):
     data.append(scans)
 
   return data
+
+
+def get_dataset_split(data_paths, train_ratio=0.7, seed=42, shuffle=True):
+  random.seed(seed)
+
+  n_samples = len(data_paths)
+  n_train = int(n_samples*train_ratio)
+  n_test = int(n_samples*(train_ratio-1)/2)
+
+  if shuffle:
+    random.shuffle(data_paths)
+
+  train_data_paths = data_paths[:n_train]
+  test_data_paths = data_paths[n_train:]
+  val_data_paths = test_data_paths[:n_test]
+  test_data_paths = test_data_paths[n_test:]
+
+  return train_data_paths, test_data_paths, val_data_paths

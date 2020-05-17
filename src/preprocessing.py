@@ -196,34 +196,36 @@ def cropVolumes(img1, img2, img3, img4):
 
 def save_nifti(imgs2save):
   for imgs in imgs2save:
-    nib.save(*imgs)
+    nib.save(*imgs) 
+
+
+# def save_npy(imgs2save):
+#   frst_slice = 0
+#   last_slice = 0
+#   seg = np.swapaxes(imgs2save["seg"]["modality"], 0, -1)
+#   for i in range(seg.shape[0]):
+#     curr_slice = seg[i, :, :]
+#     if np.sum(curr_slice) == 0:
+#       if last_slice <= frst_slice:
+#         frst_slice = i
+#     else:
+#       last_slice = i
+#   frst_slice += 1
+
+#   for name, data in imgs2save.items():
+#     modality = data["modality"]
+#     modality = np.swapaxes(modality, 0, -1)
+#     modality = modality[frst_slice:last_slice]
+#     with open(f"{data['path']}.npy", "wb") as f:
+#       np.save(f, modality)  
 
 
 def save_npy(imgs2save):
-  frst_slice = 0
-  last_slice = 0
-  seg = np.swapaxes(imgs2save["seg"]["modality"], 0, -1)
-  for i in range(seg.shape[0]):
-    curr_slice = seg[i, :, :]
-    if np.sum(curr_slice) == 0:
-      if last_slice <= frst_slice:
-        frst_slice = i
-    else:
-      last_slice = i
-  frst_slice += 1
-
   for name, data in imgs2save.items():
     modality = data["modality"]
-    path = data["path"]
     modality = np.swapaxes(modality, 0, -1)
-    modality = modality[frst_slice:last_slice]
-    for i in range(modality.shape[0]):
-      curr_slice = modality[i, :, :]
-      if not os.path.isdir(path):
-        os.makedirs(path)
-      slice_dist_path = path + os.sep + str(i)
-      with open(f"{slice_dist_path}.npy", "wb") as f:
-            np.save(f, curr_slice)  
+    with open(f"{data['path']}.npy", "wb") as f:
+      np.save(f, modality)  
 
 
 def preprocesse(imgs, dataset_name, dist_dir_path, mode="3D"):
