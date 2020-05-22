@@ -74,6 +74,20 @@ def unpack_2D_fpaths(packed_data_paths, only_with_mask=True):
   return upacked_data_paths
 
 
+def get_data_paths4existing_slit(data_dir, splitted_data, mode="2D"):
+  data_paths = []
+  for modalities in splitted_data:
+    curr_case = {}
+    for name, path in modalities.items():
+      path = path.split('/')[-2:]
+      if mode=="2D":
+        ext = '.npy'
+      elif mode=="3D":
+        ext = '.nii.gz'
+      path[-1] = path[-1].split('.')[0] + ext
+      curr_case[name] = os.path.join(data_dir, *path)
+    data_paths.append(curr_case)
+  return data_paths
 def change_orientation(img):
   img = np.moveaxis(img, 0, -1)
   img = np.swapaxes(img, 0, -2)

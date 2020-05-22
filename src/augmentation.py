@@ -66,7 +66,9 @@ def random_histogram_distortion(data: np.array, shift={'mu': 0.0, 'std': 0}, sca
     """
     
     n_channs = data[0].shape[0]
-    if len(data[0].shape) == 3:
+    if len(data[0].shape) == 2:
+      axis2distort = [1, 1]
+    elif len(data[0].shape) == 3:
       axis2distort = [n_channs, 1, 1]
     elif len(data[0].shape) == 4:
       axis2distort = [n_channs, 1, 1, 1]
@@ -94,7 +96,7 @@ def random_histogram_distortion(data: np.array, shift={'mu': 0.0, 'std': 0}, sca
     return data
 
 
-def random_rotate(data, masks, degrees=[-15, -10, -5, 0, 5, 10, 15]):
+def random_rotate(data, masks, degree_range=(-15, 15)):
   """Rotate xy (width-height) by +-15/+-10/+-5 degrees.
 
   Args:
@@ -102,12 +104,13 @@ def random_rotate(data, masks, degrees=[-15, -10, -5, 0, 5, 10, 15]):
       (x pathways) of np arrays [channels, x, y, z]. Scan data.
     masks (:obj:`numpy.array` of :obj:`np.int8`):
       numpy arrays [channels, x, y, z]. Ground truth data.
-    degrees (:obj:`numpy.array` of :obj:`int`): list of possible angle of rotation in degrees.
+    degree_range (:obj:`tuple` of :obj:`int`): tuple of the possible range of rotation.
   Returns:
     data (:obj:`numpy.array` of :obj:`np.float32`): (x pathways) of np arrays [channels, x, y, z]
     masks (:obj:`numpy.array` of :obj:`np.int8`): np array of shape [classes, x, y, z]
   """
 
+  degrees = np.arange(*degree_range, 1)
   degrees = np.random.choice(a=degrees, size=1)
   rot_deg = degrees[0]
   if rot_deg != 0:

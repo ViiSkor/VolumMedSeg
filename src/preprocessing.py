@@ -4,10 +4,20 @@ import numpy as np
 from tqdm import tqdm
 
 
-def fill_labels(img, slice_nums):
+def fill_labels(img):
+    """Close small holes inside the foreground objects,
+    or small black points on the object.
+
+    Args:
+      img (numpy.array): 
+        Ground truth numpy arrays [classes, x, y, z].
+    Returns:
+      (numpy.array): Filled ground truth.
+    """
+    
     kernel = np.ones((3, 3))
     img = img.astype(np.float32)
-    for i in range(slice_nums):
+    for i in range(img.shape[0]):
       img_slice = img[i, :, :]
       img_slice_closed = cv2.morphologyEx(img_slice, cv2.MORPH_CLOSE, kernel, iterations=3)
       img[i] = img_slice_closed
@@ -21,7 +31,7 @@ def preprocess_label(mask, output_classes=['ed'], merge_classes=False, out_shape
 
     Args:
       mask (numpy.array): 
-        Ground truth numpy arrays [classes, x, y, z]. Whole volumes, channels of a case.
+        Ground truth numpy arrays [classes, x, y, z].
       output_classes (:obj:`list` of :obj:`str`): classes to sepatare.
       merge_classes (bool): Merge output_classes into one or not.
       out_shape (tuple): Shape for scaling ground truth labels.
@@ -35,9 +45,9 @@ def preprocess_label(mask, output_classes=['ed'], merge_classes=False, out_shape
     et = mask == 4  # GD-enhancing Tumor (ET)
     
     if out_shape is not None:
-        ncr = fill_labels(resize(ncr, out_shape, mode=mode), slice_nums=out_shape[-1])
-        ed = fill_labels(resize(ed, out_shape, mode=mode), slice_nums=out_shape[-1])
-        et = fill_labels(resize(et, out_shape, mode=mode), slice_nums=out_shape[-1])
+        ncr = fill_labels(resize(ncr, out_shape, mode=mode))
+        ed = fill_labels(resize(ed, out_shape, mode=mode))
+        et = fill_labels(resize(et, out_shape, mode=mode))
 
     masks = []
     if 'ncr' in output_classes:
@@ -197,27 +207,6 @@ def cropVolumes(img1, img2, img3, img4):
 def save_nifti(imgs2save):
   for imgs in imgs2save:
     nib.save(*imgs) 
-
-
-# def save_npy(imgs2save):
-#   frst_slice = 0
-#   last_slice = 0
-#   seg = np.swapaxes(imgs2save["seg"]["modality"], 0, -1)
-#   for i in range(seg.shape[0]):
-#     curr_slice = seg[i, :, :]
-#     if np.sum(curr_slice) == 0:
-#       if last_slice <= frst_slice:
-#         frst_slice = i
-#     else:
-#       last_slice = i
-#   frst_slice += 1
-
-#   for name, data in imgs2save.items():
-#     modality = data["modality"]
-#     modality = np.swapaxes(modality, 0, -1)
-#     modality = modality[frst_slice:last_slice]
-#     with open(f"{data['path']}.npy", "wb") as f:
-#       np.save(f, modality)  
 
 
 def save_npy(imgs2save):
