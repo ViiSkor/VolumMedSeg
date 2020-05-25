@@ -113,8 +113,6 @@ def random_rotate(data, masks, degree_range=(-15, 15)):
   degrees = np.arange(*degree_range, 1)
   degrees = np.random.choice(a=degrees, size=1)
   rot_deg = degrees[0]
-  if rot_deg != 0:
-    data = ndimage.rotate(data, rot_deg, reshape=False, axes=(1,2))
-    masks = ndimage.rotate(masks, rot_deg, reshape=False, axes=(1,2))
-    return data, masks
+  data = ndimage.rotate(data, rot_deg, reshape=False, axes=(1,2))
+  masks = ndimage.rotate(masks, rot_deg, reshape=False, axes=(1,2))
   return data, masks

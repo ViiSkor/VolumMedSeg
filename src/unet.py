@@ -1,10 +1,36 @@
 from tensorflow.keras import Model
 from tensorflow.keras.layers import Conv2D, Conv3D, Conv2DTranspose, Conv3DTranspose, Input, Activation, MaxPool2D, MaxPool3D, Concatenate
+from tensorflow.keras.regularizers import l2
 
 from blocks import conv_block, dilate_conv_block
 
 
 class Unet:
+  """
+  The class of U-Net architecture [1].
+
+  Attributes:
+  n_classes (int): Unique classes in the output mask.
+  input_shape: Tensor of shape [x, y, channels]/[x, y, z, channels]
+  activation (str): A tensorflow.keras.activations.Activation to use.
+  n_base_filters (int): Convolutional filters in the initial convolutional block. Will be doubled every block.
+  batchnorm (bool): Use Batch Normalisation or not
+  dropout_prob (float): The probobility to eluminate a nerone after the initial convolutional block. Set to 0. to turn Dropout off
+  dropout_type (one of "spatial" or "standard"): Type of Dropout to apply.
+  dropout_prob_shift (float between 0. and 1.): Factor to add to the Dropout after each conv block.
+  batch_size (int): The subset size of a training sample.
+  model_depth (int): The number of blocks in decoder and encoder.
+  dilate (bool): Set to True to use dilated convolution.
+  bottleneck_depth (int): Number of layers in the bottleneck. Not matter if  dilate is True.
+  max_dilation_rate (int): Num of holes in the last conv layer in the bottleneck. Will set the number of layers in the bottleneck equal to ceil(log2(max_dilation_rate)-1.
+  name (str): Name of assembled model.
+  mode (one of "2D" or "3D"): Set type of U-Net.
+  Returns:
+  model (tensorflow.keras.models.Model): The built U-Net.
+    
+  [1]: https://arxiv.org/abs/1505.04597
+  """
+
   def __init__(self,
                n_classes,
                input_shape,
@@ -60,6 +86,7 @@ class Unet:
           "activation": None,
           "padding": "same",
           "kernel_initializer": "he_normal",
+          "kernel_regularizer": l2(0.001)
       }
 
       self.conv_transpose_kwds = {
@@ -67,6 +94,7 @@ class Unet:
             "strides": 2,
             "padding": "same",
             "kernel_initializer": "he_normal",
+            "kernel_regularizer": l2(0.001)
         }
     elif self.mode == "3D":
       self.conv_kwds = {
@@ -74,6 +102,7 @@ class Unet:
           "activation": None,
           "padding": "same",
           "kernel_initializer": "he_normal",
+          "kernel_regularizer": l2(0.001)
       }
 
       self.conv_transpose_kwds = {
@@ -81,6 +110,7 @@ class Unet:
             "strides": 2,
             "padding": "same",
             "kernel_initializer": "he_normal",
+            "kernel_regularizer": l2(0.001)
         }
     else:
       raise ValueError(f"'mode' must be one of ['2D', '3D'], but got {self.mode}")
@@ -160,7 +190,6 @@ class Unet:
 
     x = self.conv(filters=self.n_classes, kernel_size=1)(x)
     return x
-
 
   def build_model(self):
     inputs = Input(shape=self.input_shape, batch_size=self.batch_size)
