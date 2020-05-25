@@ -6,19 +6,20 @@ from matplotlib import animation
 plt.style.use('seaborn-pastel')
 
 
-def animate_scan(scan, mask):
-  fig = plt.figure(figsize=(16, 8))
-  ax1 = fig.add_subplot(1,2,1)
-  ax2 = fig.add_subplot(1,2,2)
+def animate_scan(images:list, titles:list, figsize=(16, 8)):
+  fig = plt.figure(figsize=figsize)
+  plots_num = len(titles)
+  axis = [fig.add_subplot(1, plots_num, i) for i in range(1, plots_num+1)]
 
   myimages = []
-  for i in range(scan.shape[0]):
-      ax1.axis('off')
-      ax1.set_title('Scan', fontsize='medium')
-      ax2.axis('off')
-      ax2.set_title('Mask', fontsize='medium')
+  for i in range(images[0].shape[0]):
+    curr_slice = []
+    for ax_idx, (img, title) in enumerate(zip(images, titles)):
+      axis[ax_idx].axis('off')
+      axis[ax_idx].set_title(title, fontsize=18)
+      curr_slice.append(axis[ax_idx].imshow(img[i], cmap='Greys_r'))
       
-      myimages.append([ax1.imshow(scan[i], cmap='Greys_r'), ax2.imshow(mask[i], cmap='Greys_r')])
+    myimages.append(curr_slice)
 
   anim = animation.ArtistAnimation(fig, myimages, interval=1000, blit=True, repeat_delay=1000)
   return anim

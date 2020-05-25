@@ -133,3 +133,27 @@ def mean_iou(y_true, y_pred):
       y_pred = K.cast(K.greater(y_pred, t), dtype='float32')
       score = iou(y_true, y_pred)
       prec.append(score)
+
+
+def mean_dice(y_true, y_pred):
+    """Mean of dice score.
+    Thresholds for mask are from 0.5, to 1.0 with a step 0.5.
+  
+    Args:
+      y_true (numpy.array/tf.tensor):
+        b x X x Y( x Z...) x c One hot encoding of ground truth.
+      y_pred (numpy.array/tf.tensor):
+        b x X x Y( x Z...) x c Network output, must sum to 1 over c channel.
+    Returns:
+      (tf.tensor): Mean IoU coefficient.
+    """
+
+    prec = []
+    for t in np.arange(0.5, 1.0, 0.05):
+      y_pred = K.cast(K.greater(y_pred, t), dtype='float32')
+      y_pred = K.constant(y_pred)
+      y_true = K.constant(y_true)
+      score = dice_coefficient(y_true, y_pred)
+      prec.append(score)
+
+    return K.mean(K.stack(prec), axis=0)

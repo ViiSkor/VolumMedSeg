@@ -170,3 +170,92 @@ def get_dataset_split(data_paths, train_ratio=0.7, seed=42, shuffle=True):
   test_data_paths = test_data_paths[n_test:]
 
   return train_data_paths, test_data_paths, val_data_paths
+
+
+def stack_2D_2_3D(samples_sep, arr, dim, n_channels):
+  stacked_pred = []
+  prev_idx = 0
+  for sep in samples_sep:
+    pred = arr[prev_idx:prev_idx+sep]
+    if pred.shape[0] > dim[0]:
+      depth_shift = int((pred.shape[0] - dim[0]) // 2)+1
+      pred = pred[depth_shift:-depth_shift,:,:,:]
+    pred = np.moveaxis(pred, -1, 0)
+    _, pred = pad(pred, pred, pred.shape[1:],  dim, n_channels, n_channels)
+    pred = np.moveaxis(pred, 0, -1)
+    stacked_pred.append(pred)
+    prev_idx += sep + 1
+
+  return np.array(stacked_pred)
+
+
+def load_sample(path, dim, scan_types, classes, merge_classes, mode="3D"):
+  dim_before_axes_swap = (dim[-1], dim[1], dim[0])
+  if mode=="3D":
+    masks = preprocess_label(np.asanyarray(nib.load(path['seg']).dataobj), output_classes=classes, merge_classes=merge_classes)
+    imgs = np.array([np.asanyarray(nib.load(path[m]).dataobj) for m in scan_types])
+  elif mode=="2D":
+    masks = preprocess_label(np.load(path['seg']), output_classes=classes, merge_classes=merge_classes)
+    imgs = np.array([np.load(path[m]) for m in scan_types], dtype=np.float16)
+    imgs = np.moveaxis(imgs, [0, 1, 2, 3], [0, 3, 2, 1])
+    masks = np.moveaxis(masks, [0, 1, 2, 3], [0, 3, 2, 1])
+
+  imgs, masks = crop(imgs, masks, depth=dim[0])
+  imgs, masks = pad(imgs, masks, masks.shape[1:],  dim_before_axes_swap, n_channels, n_classes)
+
+  imgs = change_orientation(imgs)
+  masks = change_orientation(masks)
+
+  return masks, imgs
+
+
+def evaluate(data_paths, prediction, metric, dim, scan_types, classes, merge_classes, mode="3D"):
+  scores = {'class': [], 'score': []}
+  for path, pred in zip(data_paths, prediction):
+    if merge_classes:
+      load = ['mask']
+    else:
+      load = classes
+    for cls in load:
+      if merge_classes:
+        cls = classes
+        cls_name = 'mask'
+      else:
+        cls_name = cls
+        cls = [cls]
+      mask, _ = load_sample(path=path, dim=dim, scan_types=scan_types, classes=cls, merge_classes=merge_classes, mode=mode)
+      mask = np.array([mask])
+      pred = np.array([pred])
+      score = metric(mask, pred)
+      scores['class'] = scores['class'] + [cls_name]
+      scores['score'] = scores['score'] + [score.numpy()]
+  return scores
+
+
+def get_data_paths4existing_slit(data_dir, splitted_data, mode="2D"):
+  data_paths = []
+  for modalities in splitted_data:
+    curr_case = {}
+    for name, path in modalities.items():
+      path = path.split('/')[-2:]
+      if mode=="2D":
+        ext = '.npy'
+      elif mode=="3D":
+        ext = '.nii.gz'
+      path[-1] = path[-1].split('.')[0] + ext
+      curr_case[name] = os.path.join(data_dir, *path)
+    data_paths.append(curr_case)
+  return data_paths
+
+
+def get_2D_sep_slices(paths_unnpacked):
+  samples_sep = []
+  prev_slice_idx = 0
+  for i, path in enumerate(paths_unnpacked):
+    if path['seg'][1] == 0:
+      samples_sep.append(prev_slice_idx)
+    prev_slice_idx = path['seg'][1]
+
+  samples_sep.append(prev_slice_idx)
+  samples_sep.pop(0)
+  return samples_sep
