@@ -6,6 +6,8 @@ import numpy as np
 import nibabel as nib
 from tqdm import tqdm
 
+from preprocessing import preprocess_label, crop, pad
+
 
 def get_fpaths(data_dir, mode="3D"):
   '''Parse all the filenames and create a dictionary for each patient with structure:
@@ -189,7 +191,7 @@ def stack_2D_2_3D(samples_sep, arr, dim, n_channels):
   return np.array(stacked_pred)
 
 
-def load_sample(path, dim, scan_types, classes, merge_classes, mode="3D"):
+def load_sample(path, dim, scan_types, classes, merge_classes, n_channels, n_classes, mode="3D"):
   dim_before_axes_swap = (dim[-1], dim[1], dim[0])
   if mode=="3D":
     masks = preprocess_label(np.asanyarray(nib.load(path['seg']).dataobj), output_classes=classes, merge_classes=merge_classes)
@@ -223,7 +225,7 @@ def evaluate(data_paths, prediction, metric, dim, scan_types, classes, merge_cla
       else:
         cls_name = cls
         cls = [cls]
-      mask, _ = load_sample(path=path, dim=dim, scan_types=scan_types, classes=cls, merge_classes=merge_classes, mode=mode)
+      mask, _ = load_sample(path=path, dim=dim, scan_types=scan_types, classes=cls, merge_classes=merge_classes, n_channels=len(scan_types), n_classes=1, mode=mode)
       mask = np.array([mask])
       pred = np.array([pred])
       score = metric(mask, pred)
